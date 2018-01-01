@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Canterbury Business Ratings</title>
+	<meta charset="utf-8" />
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css" />
+	<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+	
+	<style>
+		#hygieneTable{
+			width: 100%;
+			margin: 1.2em auto;
+			text-align: center;
+			font-family: Arial, sans-serif;
+			border-collapse: collapse;
+		}
+
+		th, td{
+			border-bottom: 1px solid #ddd;
+			padding: 0.5em;
+		}
+		
+		th {
+			background-color: #4ABF42;
+			color: black;
+		}
+
+		p{
+			font-family: Arial, sans-serif;
+			text-align: center;
+		}
+
+		.page, .rating, #search{
+			background-color: white;
+			color: black;
+			padding: 7px;
+		}
+
+		.page:hover, .rating:hover, #search:hover{
+			background-color: black;
+			color: white;
+			cursor: pointer;
+		}
+
+		#popup{
+			background-color:black;
+			color:white;
+			text-align: center;
+			font-size: 30px;
+		}
+
+		.ui-widget-header{
+			color: #4ABF42;
+			font-family: Arial, sans-serif;
+			text-align: center;
+		}
+
+		#paginator{
+			margin: 0.7em auto;
+			text-align: center;
+		}
+
+		.search-container{
+			text-align:center;
+			margin: 25px auto;
+			font-family: Arial, sans-serif;
+		}
+
+		.search-container input {
+			width: 25%;
+			height: 25px;
+		}
+
+		span{
+			color: black;
+			border: 1px solid black;
+			padding: 0.3em;
+		}
+
+	</style>
+	
+	<script>
+		$(document).ready(function() {
+
+			// Inserts the default set of restaurant data into the table.
+			$.getJSON("https://www.cs.kent.ac.uk/people/staff/lb514/hygiene/hygiene.php", {op:"demo"} ,
+			function(data,status){
+				insertIntoTable(data);
+			});
+
+			/* Clears the table of results.
+			 * Inserts new set of results into rows in the table and appends it to the table. 
+			 * @param Set of parsed data for each restaurant.
+			 */
+			function insertIntoTable(data){
+				$('#hygieneTable tbody').remove();
+				$.each(data, function(k, col){
+					var $row = $('<tr>').append(
+					$('<td>').text(col.business),
+					$('<td>').text(col.address),
+					$('<td>').text(col.rating),
+					$('<td>').text(col.date),
+					$('<td>').append("<button class='rating' value='"+col.business+"' value2='"+col.postcode+"'>Get Rating</button>"));	
+					$row.appendTo('#hygieneTable');
+				});
+			}
+
+			// Assigns the source with tags for an autocomplete feature.
+			// Shows suggestions when focus is on the text field.
+			var tags = ['A La Turka', 'Blean Tavern', 'Cafe Turquiose', 'Coconut Tree Noodle Bar Ltd'];
+			$("#businessName").autocomplete({
+        		source: tags,
+        		minLength:0,
+        		position: {my: "left bottom", at: "left top", collision: "flip"}
+    		}).bind('focus', function(){ $(this).autocomplete("search"); } );
+			
+
+			
+			/* Implements a paginator.
+			 * Obtains the number for the amount of pages of results. 
+			 * Creates a button for each number.
+			 */
+			$.getJSON("https://www.cs.kent.ac.uk/people/staff/lb514/hygiene/hygiene.php", {op:"pages"}, 
+			function(data){
+				for(var i=1; i <= data.pages; i++){
+					$("#paginator").append("<button class='page' value='"+i+"'>" + i + "</button>");
+				}
+			});
+			
+			/* Loads the page of the numbered button the user clicks on.
+			 * Obtains the number of the page via the stored value attribute.
+			 * Retrieves the data set for that page and calls a method to insert the data into a table.
+			 */
+			$('#paginator').on('click', '.page', function(){
+				var $pageNo = $(this).val();
+				$.getJSON("https://www.cs.kent.ac.uk/people/staff/lb514/hygiene/hygiene.php", {op:'retrieve', page:$pageNo },
+				function(data){
+					insertIntoTable(data);
+				});
+			});
+
+			/* Displays the rating obtained from rating.php for the business in an alert box.
+			 * Business name obtained from value attribute in the button.
+			 * If the business name is not found in the script then a message will inform the user in the alert box.
+			 * If there is data returned, for each business it checks if the address string contains the postcode
+			 * of the business which is stored in another value attribute in the button and displays the appropriate rating.
+			 * If the business has been found but is not given a rating then the appriopriate message will be displayed.
+			 */
+			$('#hygieneTable').on('click', '.rating', function(){
+				var $postcode = $(this).attr('value2');
+				$.getJSON("https://www.cs.kent.ac.uk/people/staff/lb514/hygiene/rating.php", {name:$(this).val()},
+				function(data){
+					if(data.length == 0){alert("Business rating not found");}
+					$.each(data, function(k, col){
+						if(col.address.search($postcode) != -1){
+							if(col.rating != ""){alert("Rating: " + col.rating);}
+							else{alert("No rating found");}
+						}
+					});
+				});
+			});
+			
+
+			/* Displays the record for the business' that contain the search name that is entered in the search form.
+			 * Calls the method to insert the data set into the table.
+			 * Adds the business' returned by the search text as tags.
+			 */
+			$('#search').on('click', function(){
+				var searchText = $('#businessName').val();
+				$.getJSON("https://www.cs.kent.ac.uk/people/staff/lb514/hygiene/hygiene.php", {op:'searchname', name: searchText},
+				function(data){
+					$.each(data, function(k, col){
+						if(tags.indexOf(col.business) == -1)
+							tags.push(col.business); 
+					});
+					insertIntoTable(data);
+				});
+			});		
+	   });
+		
+	</script>
+	
+</head>
+<body>
+	
+	<!-- Title of the page (Uses the JQuery UI styling class) --> 
+	<div class="ui-widget-header">
+		<h1 id=title>CANTERBURY <span>BUSINESS RATINGS</span></h1>
+	</div>
+
+	<!-- Text explaining what the page does -->
+	<p>
+	   This page contains information of restaurants and other business' in Canterbury, their hygiene ratings and customer ratings. <br />
+	   Use the search bar at the bottom to filter the results to tailor to the business' that contain the search text. <br />
+	   Select a page number to display the business' for that page. 
+	</p>
+
+	<!-- Container for the paginator -->
+	<div id="paginator"></div>
+
+	<!-- Table to insert the results and meta data -->
+	<table id="hygieneTable">
+		<thead>
+			<tr>
+				<th>BUSINESS</th>
+				<th>ADDRESS</th>
+				<th>HYGIENE</th>
+				<th>DATE</th>
+				<th>RATING</th>
+			</tr>
+		</thead>
+		<tbody>
+		</tbody>
+	</table>
+	<!-- Container for the business search function -->
+	<div class="search-container">
+		<label>Business: </label>
+		<input type="text" id="businessName" required/>
+		<button id="search">Search</button>
+	</div>
+</body>
+</html>
